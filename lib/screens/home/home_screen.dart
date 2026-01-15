@@ -7,6 +7,7 @@ import '../rewards/rewards_screen.dart';
 import '../history/history_screen.dart';
 import '../donation/donation_screen.dart';
 import '../reviews/reviews_screen.dart';
+import '../admin/logs_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -33,6 +34,7 @@ class HomeScreen extends StatelessWidget {
           final int points = data['point'] ?? 0;
           final bool isPremium = data['isPremium'] ?? false;
           final String prenom = data['prenom'] ?? 'Gourmand';
+          final bool isAdmin = data['isAdmin'] ?? false;
 
           return SafeArea(
             child: SingleChildScrollView(
@@ -58,16 +60,20 @@ class HomeScreen extends StatelessWidget {
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: isPremium 
-                            ? [Colors.purple.shade700, Colors.purple.shade400] 
-                            : [Colors.orange.shade700, Colors.orange.shade400],
+                        colors: isAdmin 
+                            ? [const Color(0xFFD32F2F), const Color(0xFFEF5350)] // ROUGE SI ADMIN
+                            : isPremium 
+                                ? [Colors.purple.shade700, Colors.purple.shade400] 
+                                : [Colors.orange.shade700, Colors.orange.shade400],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color: isPremium ? Colors.purple.withOpacity(0.3) : Colors.orange.withOpacity(0.3),
+                          color: isAdmin 
+                            ? Colors.red.withOpacity(0.3) 
+                            : (isPremium ? Colors.purple.withOpacity(0.3) : Colors.orange.withOpacity(0.3)),
                           blurRadius: 10,
                           offset: const Offset(0, 5),
                         )
@@ -99,7 +105,7 @@ class HomeScreen extends StatelessWidget {
                                   ),
                                   const SizedBox(width: 5),
                                   Text(
-                                    isPremium ? "PREMIUM" : "CLASSIQUE",
+                                    isAdmin ? "ADMIN" : (isPremium ? "PREMIUM" : "CLASSIQUE"),
                                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
                                   ),
                                 ],
@@ -195,6 +201,39 @@ class HomeScreen extends StatelessWidget {
                       ),
                     ],
                   ),
+
+                  const SizedBox(height: 30),
+
+                  // --- BOUTON ADMIN (Style "En long") ---
+                  if (isAdmin)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 20.0),
+                      child: SizedBox(
+                        width: double.infinity, // Prend toute la largeur
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const LogsScreen()),
+                            );
+                          },
+                          // J'utilise une icône de sécurité
+                          icon: const Icon(Icons.security),
+                          label: const Text("ESPACE ADMIN - LOGS"),
+                          style: OutlinedButton.styleFrom(
+                            // Utilisation BlueGrey pour différencier du Rouge (Logout/Danger)
+                            // Style (bordure, fond transparent) est identique
+                            foregroundColor: Colors.blueGrey, 
+                            side: const BorderSide(color: Colors.blueGrey, width: 1.5),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(30), // Bords très arrondis (capsule)
+                            ),
+                            textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),

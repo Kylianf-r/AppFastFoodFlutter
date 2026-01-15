@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'services/cart_service.dart';
+import 'dart:ui';
+import 'services/log_service.dart';
 
 // Import de tes fichiers
 import 'services/auth_service.dart';
@@ -14,6 +16,19 @@ void main() async {
   // Initialisation de Firebase SANS les options.
   // Flutter va automatiquement détecter ton fichier android/app/google-services.json
   await Firebase.initializeApp();
+  
+  // --- 1. CAPTURE DES ERREURS FLUTTER (Écrans rouges) ---
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details); // Affiche l'erreur normalement dans la console
+    // Envoie l'erreur à Firestore
+    LogService().error('FLUTTER_CRASH', details.exceptionAsString());
+  };
+
+  // --- 2. CAPTURE DES ERREURS ASYNCHRONES (Bugs invisibles) ---
+  PlatformDispatcher.instance.onError = (error, stack) {
+    LogService().error('ASYNC_ERROR', error.toString());
+    return true; // Dit à Flutter qu'on a géré l'erreur
+  };
 
   runApp(const MyApp());
 }

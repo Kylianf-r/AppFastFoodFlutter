@@ -7,7 +7,14 @@ class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
   // Petite fonction pour déterminer le statut
-  Map<String, dynamic> _getLoyaltyStatus(int lifetimePoints) {
+  // On ajoute le paramètre 'isAdmin'
+  Map<String, dynamic> _getLoyaltyStatus(int lifetimePoints, bool isAdmin) {
+    // Si c'est un admin, on renvoie direct le statut spécial
+    if (isAdmin) {
+      return {'label': 'ADMIN', 'color': Colors.red, 'icon': Icons.security};
+    }
+    
+    // Sinon, logique classique des points
     if (lifetimePoints >= 500) {
       return {'label': 'OR', 'color': const Color(0xFFFFD700), 'icon': Icons.emoji_events};
     } else if (lifetimePoints >= 100) {
@@ -114,11 +121,12 @@ class ProfileScreen extends StatelessWidget {
           final String nom = data['nom'] ?? 'Inconnu';
           final String prenom = data['prenom'] ?? '';
           final String email = data['email'] ?? user.email;
+          final bool isAdmin = data['isAdmin'] ?? false;
           final bool isPremium = data['isPremium'] ?? false;
           final int lifetimePoints = data['niveauFidelite'] ?? 0;
           final int currentPoints = data['point'] ?? 0;
-
-          final statusInfo = _getLoyaltyStatus(lifetimePoints);
+          // On passe isAdmin à la fonction
+          final statusInfo = _getLoyaltyStatus(lifetimePoints, isAdmin);
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16.0),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
+import '../../services/log_service.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -22,7 +23,17 @@ class _LoginScreenState extends State<LoginScreen> {
         _emailController.text.trim(),
         _passwordController.text.trim(),
       );
+      
+      // ✅ LOG DE SUCCÈS
+      // On attend un tout petit peu pour être sûr que l'utilisateur est bien set par Firebase
+      Future.delayed(const Duration(milliseconds: 500), () {
+         LogService().info('CONNEXION', 'Connexion réussie via email');
+      });
+
     } catch (e) {
+      // ❌ LOG D'ERREUR
+      LogService().error('ERREUR_CONNEXION', e.toString());
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("Erreur : ${e.toString()}")),
