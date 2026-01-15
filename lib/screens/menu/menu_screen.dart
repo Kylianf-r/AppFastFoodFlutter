@@ -5,10 +5,22 @@ import 'package:provider/provider.dart';
 // Imports de tes modèles et services
 import '../../models/product_model.dart';
 import '../../services/cart_service.dart';
-import '../cart/cart_screen.dart'; // <--- L'import crucial pour la navigation
+import '../cart/cart_screen.dart';
 
-class MenuScreen extends StatelessWidget {
+// ON PASSE EN STATEFULWIDGET POUR GÉRER L'ÉTAT DU FILTRE
+class MenuScreen extends StatefulWidget {
   const MenuScreen({super.key});
+
+  @override
+  State<MenuScreen> createState() => _MenuScreenState();
+}
+
+class _MenuScreenState extends State<MenuScreen> {
+  // Gestion du filtre sélectionné
+  String _selectedCategory = "Menu";
+  
+  // Liste des filtres disponibles
+  final List<String> _categories = ["Menu", "Burger", "Boisson", "Dessert"];
 
   @override
   Widget build(BuildContext context) {
@@ -23,15 +35,14 @@ class MenuScreen extends StatelessWidget {
               builder: (context, cart, child) {
                 return IconButton(
                   onPressed: () {
-                    // C'est ici qu'on navigue vers l'écran Panier
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (context) => const CartScreen()),
                     );
                   },
                   icon: Badge(
-                    label: Text(cart.count.toString()), // Affiche le nombre d'articles
-                    isLabelVisible: cart.count > 0,     // Cache le badge si 0
+                    label: Text(cart.count.toString()),
+                    isLabelVisible: cart.count > 0,
                     child: const Icon(Icons.shopping_cart),
                   ),
                 );
@@ -40,52 +51,100 @@ class MenuScreen extends StatelessWidget {
           )
         ],
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        // On récupère uniquement les produits où "Actif" est vrai
-        stream: FirebaseFirestore.instance
-            .collection('produit')
-            .where('actif', isEqualTo: true)
-            .snapshots(),
-        builder: (context, snapshot) {
-          // 1. Chargement
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          // 2. Erreur
-          if (snapshot.hasError) {
-            return const Center(child: Text("Oups, une erreur est survenue."));
-          }
-          // 3. Pas de données
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text("Aucun produit disponible pour le moment."));
-          }
-
-          // 4. On transforme les documents en objets Product
-          final products = snapshot.data!.docs.map((doc) {
-            return Product.fromFirestore(doc);
-          }).toList();
-
-          // 5. Affichage de la Grille
-          return GridView.builder(
-            padding: const EdgeInsets.all(10),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,       // 2 colonnes
-              childAspectRatio: 0.75,  // Format un peu plus haut que large
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 10,
+      body: Column(
+        children: [
+          // --- BARRE DE FILTRES ---
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: _categories.map((category) {
+                  final isSelected = _selectedCategory == category;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: ChoiceChip(
+                      label: Text(category),
+                      selected: isSelected,
+                      selectedColor: Colors.orange,
+                      labelStyle: TextStyle(
+                        color: isSelected ? Colors.white : Colors.black,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      ),
+                      onSelected: (selected) {
+                        if (selected) {
+                          setState(() => _selectedCategory = category);
+                        }
+                      },
+                    ),
+                  );
+                }).toList(),
+              ),
             ),
-            itemCount: products.length,
-            itemBuilder: (context, index) {
-              return _ProductCard(product: products[index]);
-            },
-          );
-        },
+          ),
+
+          // --- GRILLE DES PRODUITS ---
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('produit')
+                  .where('actif', isEqualTo: true) // Attention à la majuscule/minuscule selon ta BDD
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return const Center(child: Text("Oups, une erreur est survenue."));
+                }
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return const Center(child: Text("Aucun produit disponible."));
+                }
+
+                // 1. On transforme tout en liste de produits
+                final allProducts = snapshot.data!.docs.map((doc) {
+                  return Product.fromFirestore(doc);
+                }).toList();
+
+                // 2. On applique le filtre localement (Côté Dart)
+                final filteredProducts = allProducts.where((product) {
+                  if (_selectedCategory == "Tout") return true;
+                  // On compare en minuscules pour éviter les soucis (ex: "Burger" vs "burger")
+                  return product.category.toLowerCase() == _selectedCategory.toLowerCase();
+                }).toList();
+
+                if (filteredProducts.isEmpty) {
+                  return const Center(
+                    child: Text("Aucun produit dans cette catégorie."),
+                  );
+                }
+
+                // 3. Affichage
+                return GridView.builder(
+                  padding: const EdgeInsets.all(10),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    childAspectRatio: 0.75,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                  ),
+                  itemCount: filteredProducts.length,
+                  itemBuilder: (context, index) {
+                    return _ProductCard(product: filteredProducts[index]);
+                  },
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-// --- WIDGET CARTE PRODUIT ---
+// --- WIDGET CARTE PRODUIT (Inchangé, sauf imports si besoin) ---
 class _ProductCard extends StatelessWidget {
   final Product product;
 
@@ -93,7 +152,6 @@ class _ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // On récupère le service panier pour pouvoir ajouter des items
     final cart = Provider.of<CartService>(context, listen: false);
 
     return Card(
@@ -102,7 +160,6 @@ class _ProductCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // IMAGE
           Expanded(
             child: Container(
               width: double.infinity,
@@ -117,12 +174,10 @@ class _ProductCard extends StatelessWidget {
                     : null,
               ),
               child: product.imageUrl.isEmpty
-                  ? const Icon(Icons.fastfood, size: 50, color: Colors.grey) // Image par défaut
+                  ? const Icon(Icons.fastfood, size: 50, color: Colors.grey)
                   : null,
             ),
           ),
-          
-          // INFORMATIONS
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Column(
@@ -141,8 +196,6 @@ class _ProductCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 8),
-                
-                // PRIX + BOUTON AJOUTER
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -153,16 +206,13 @@ class _ProductCard extends StatelessWidget {
                     IconButton(
                       icon: const Icon(Icons.add_circle, color: Colors.orange, size: 30),
                       onPressed: () {
-                        // Action d'ajout au panier
                         cart.add(product);
-                        
-                        // Petit message de confirmation
                         ScaffoldMessenger.of(context).hideCurrentSnackBar();
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text("${product.name} ajouté au panier !"),
+                            content: Text("${product.name} ajouté !"),
                             duration: const Duration(seconds: 1),
-                            behavior: SnackBarBehavior.floating, // Flotte au-dessus du bas
+                            behavior: SnackBarBehavior.floating,
                           ),
                         );
                       },

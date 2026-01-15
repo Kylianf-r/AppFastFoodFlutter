@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../rewards/rewards_screen.dart';
 import '../history/history_screen.dart';
 import '../donation/donation_screen.dart';
+import '../reviews/reviews_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -179,14 +180,17 @@ class HomeScreen extends StatelessWidget {
                         },
                       ),
 
-                      // BOUTON 4 : INFO (Juste pour remplir la grille ou autre future feature)
+                      // BOUTON 4 : AVIS
                       _MenuButton(
                         title: "Avis",
                         subtitle: "Laissez un avis !",
                         icon: Icons.rate_review,
                         color: const Color.fromARGB(255, 255, 164, 28),
                         onTap: () {
-                           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("En développement")));
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const ReviewsScreen()),
+                          );
                         },
                       ),
                     ],

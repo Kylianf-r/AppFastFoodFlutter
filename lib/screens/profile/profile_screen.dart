@@ -6,7 +6,7 @@ import '../../services/auth_service.dart';
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
-  // Petite fonction pour déterminer le statut selon les points cumulés
+  // Petite fonction pour déterminer le statut
   Map<String, dynamic> _getLoyaltyStatus(int lifetimePoints) {
     if (lifetimePoints >= 500) {
       return {'label': 'OR', 'color': const Color(0xFFFFD700), 'icon': Icons.emoji_events};
@@ -17,12 +17,71 @@ class ProfileScreen extends StatelessWidget {
     }
   }
 
+  // --- NOUVELLE FONCTION : SUPPRESSION DE COMPTE ---
+  Future<void> _deleteAccount(BuildContext context) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    // 1. Demande de confirmation (Dialogue d'alerte)
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Supprimer le compte ?"),
+        content: const Text(
+          "Attention, cette action est irréversible.\n\nToutes vos données (points, historique, profil) seront définitivement effacées.",
+          style: TextStyle(color: Colors.red),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text("Annuler"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text("SUPPRIMER"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      // 2. Supprimer les données Firestore AVANT de supprimer le compte Auth
+      // (Car une fois le compte Auth supprimé, on perd les droits d'accès pour supprimer le doc)
+      await FirebaseFirestore.instance.collection('user').doc(user.uid).delete();
+
+      // 3. Supprimer le compte Firebase Auth
+      await user.delete();
+
+      // Note : Le Stream dans main.dart va détecter la disparition du user et renvoyer au Login
+      
+    } on FirebaseAuthException catch (e) {
+      // Cas particulier : Si l'utilisateur est connecté depuis trop longtemps, 
+      // Firebase demande de se reconnecter avant de pouvoir supprimer le compte (sécurité).
+      if (e.code == 'requires-recent-login') {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Par sécurité, veuillez vous déconnecter et vous reconnecter avant de supprimer votre compte.")),
+          );
+        }
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erreur : ${e.message}")));
+        }
+      }
+    } catch (e) {
+       if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erreur : $e")));
+       }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    // On récupère l'ID de l'utilisateur connecté
     final user = FirebaseAuth.instance.currentUser;
 
-    // Sécurité si jamais l'utilisateur est null (ne devrait pas arriver ici)
     if (user == null) return const Center(child: Text("Non connecté"));
 
     return Scaffold(
@@ -32,43 +91,33 @@ class ProfileScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
-              // Déconnexion
               await AuthService().signOut();
-              // Le Stream dans main.dart détectera la déconnexion et affichera le LoginScreen
             },
           )
         ],
       ),
       body: StreamBuilder<DocumentSnapshot>(
-        // On écoute le document de l'utilisateur en temps réel
         stream: FirebaseFirestore.instance.collection('user').doc(user.uid).snapshots(),
         builder: (context, snapshot) {
-          // 1. Cas de chargement
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-
-          // 2. Cas d'erreur
           if (snapshot.hasError) {
             return const Center(child: Text("Erreur de chargement"));
           }
-
-          // 3. Vérification que le document existe
           if (!snapshot.hasData || !snapshot.data!.exists) {
             return const Center(child: Text("Profil introuvable"));
           }
 
-          // 4. Récupération des données brutes
           final data = snapshot.data!.data() as Map<String, dynamic>;
           
           final String nom = data['nom'] ?? 'Inconnu';
           final String prenom = data['prenom'] ?? '';
           final String email = data['email'] ?? user.email;
           final bool isPremium = data['isPremium'] ?? false;
-          final int lifetimePoints = data['niveauFidelite'] ?? 0; // Points à vie
-          final int currentPoints = data['point'] ?? 0; // Solde actuel
+          final int lifetimePoints = data['niveauFidelite'] ?? 0;
+          final int currentPoints = data['point'] ?? 0;
 
-          // Calcul du statut
           final statusInfo = _getLoyaltyStatus(lifetimePoints);
 
           return SingleChildScrollView(
@@ -157,7 +206,7 @@ class ProfileScreen extends StatelessWidget {
 
                 const SizedBox(height: 40),
                 
-                // --- BOUTON DÉCONNEXION (Optionnel en bas aussi) ---
+                // --- BOUTON DÉCONNEXION ---
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
@@ -169,7 +218,16 @@ class ProfileScreen extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(vertical: 16)
                     ),
                   ),
-                )
+                ),
+
+                // --- BOUTON SUPPRIMER LE COMPTE (AJOUTÉ ICI) ---
+                const SizedBox(height: 20),
+                TextButton.icon(
+                  onPressed: () => _deleteAccount(context),
+                  icon: const Icon(Icons.delete_forever, size: 20, color: Color.fromARGB(255, 255, 0, 0)),
+                  label: const Text("Supprimer mon compte définitivement", style: TextStyle(color: Color.fromARGB(255, 255, 0, 0), fontSize: 12)),
+                ),
+                const SizedBox(height: 20), // Marge de fin
               ],
             ),
           );
@@ -178,7 +236,6 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  // Petit widget helper pour éviter de répéter du code
   Widget _buildInfoCard({required String title, required String value, required Color color, required IconData icon}) {
     return Card(
       elevation: 2,

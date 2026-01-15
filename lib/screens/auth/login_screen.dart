@@ -22,14 +22,70 @@ class _LoginScreenState extends State<LoginScreen> {
         _emailController.text.trim(),
         _passwordController.text.trim(),
       );
-      // Pas besoin de naviguer manuellement, le Stream dans main.dart s'en charge
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Erreur : ${e.toString()}")),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Erreur : ${e.toString()}")),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  // --- NOUVELLE FONCTION : GESTION DU MOT DE PASSE OUBLIÉ ---
+  void _showForgotPasswordDialog() {
+    final resetEmailController = TextEditingController();
+    // On pré-remplit avec ce que l'utilisateur a déjà tapé dans le champ principal
+    resetEmailController.text = _emailController.text;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Réinitialiser le mot de passe"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text("Entrez votre email pour recevoir un lien de réinitialisation."),
+            const SizedBox(height: 10),
+            TextField(
+              controller: resetEmailController,
+              decoration: const InputDecoration(labelText: "Email", border: OutlineInputBorder()),
+              keyboardType: TextInputType.emailAddress,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Annuler"),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (resetEmailController.text.isEmpty) return;
+              
+              Navigator.pop(context); // Fermer la modale
+              
+              try {
+                await _authService.sendPasswordResetEmail(resetEmailController.text.trim());
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Email de réinitialisation envoyé ! Vérifiez vos spams.")),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Erreur : ${e.toString()}")),
+                  );
+                }
+              }
+            },
+            child: const Text("Envoyer"),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -45,17 +101,31 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 20),
               const Text("BurgerQueen", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
               const SizedBox(height: 40),
+              
               TextField(
                 controller: _emailController,
                 decoration: const InputDecoration(labelText: "Email", border: OutlineInputBorder()),
+                keyboardType: TextInputType.emailAddress,
               ),
               const SizedBox(height: 16),
+              
               TextField(
                 controller: _passwordController,
                 decoration: const InputDecoration(labelText: "Mot de passe", border: OutlineInputBorder()),
                 obscureText: true,
               ),
-              const SizedBox(height: 24),
+
+              // --- AJOUT DU BOUTON MOT DE PASSE OUBLIÉ ---
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: _showForgotPasswordDialog,
+                  child: const Text("Mot de passe oublié ?", style: TextStyle(color: Colors.grey)),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+              
               _isLoading
                   ? const CircularProgressIndicator()
                   : SizedBox(
@@ -66,15 +136,17 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: const Text("SE CONNECTER"),
                       ),
                     ),
+                    
+              const SizedBox(height: 10),
+              
               TextButton(
-                onPressed: () {
-                  // Navigation vers la page d'inscription
-                  Navigator.push(
-                    context, 
-                    MaterialPageRoute(builder: (context) => const RegisterScreen()),
-                  );
-                }, 
-                child: const Text("Créer un compte")
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const RegisterScreen()),
+                    );
+                  },
+                  child: const Text("Créer un compte")
               )
             ],
           ),

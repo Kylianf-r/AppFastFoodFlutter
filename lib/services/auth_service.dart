@@ -16,6 +16,11 @@ class AuthService {
     }
   }
 
+  // Envoi de l'email de réinitialisation
+  Future<void> sendPasswordResetEmail(String email) async {
+    await _auth.sendPasswordResetEmail(email: email);
+  }
+
   // Déconnexion
   Future<void> signOut() async {
     await _auth.signOut();
